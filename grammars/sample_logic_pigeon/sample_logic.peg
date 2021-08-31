@@ -1,0 +1,142 @@
+{
+package sample_logic_pigeon
+import (
+   "fmt"
+)
+
+var Functions = map[string]func(string) bool{}
+
+var ops = map[string]func(bool, bool) bool{
+	"and": func(l, r bool) bool {
+		return l && r
+	},
+	"or": func(l, r bool) bool {
+		return l || r
+	},
+}
+
+func toIfaceSlice(v interface{}) []interface{} {
+	if v == nil {
+		return nil
+	}
+	return v.([]interface{})
+}
+
+func toStr(v interface{}) (r string) {
+	if v == nil {
+		return
+	}
+	r = v.(string)
+	return
+}
+
+func eval(first, rest interface{}) bool {
+	l := first.(bool)
+	restSl := toIfaceSlice(rest)
+	for _, v := range restSl {
+		restExpr := toIfaceSlice(v)
+		r := restExpr[3].(bool)
+		op := restExpr[1].(string)
+		l = ops[op](l, r)
+	}
+	return l
+}
+
+func main() {
+   input := "(eq1('1') and eq2('2')) or eq1('3')"
+	got, err := ParseReader("", strings.NewReader(input))
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(input,"=",got)
+}
+}
+
+Input <- _ expr:Expr _ EOF {
+   return expr.(bool), nil
+}
+
+Expr <- _ first:Term rest:( _ AND _ Term )* _ {
+   return eval(first, rest), nil
+}
+
+Term <- _ first:Factor rest:( _ OR _ Factor )* _ {
+   return eval(first, rest), nil
+}
+
+Factor <- _ LPAR expr:Expr RPAR _ {
+   return expr, nil
+} / fn:FnExp {
+   return fn, nil
+}
+
+
+FnExp <- id:Identifier LPAR p:ParameterDeclaration RPAR {
+
+   fnName := toStr(id)
+   fnP := toStr(p)
+   fn, ok := Functions[fnName]
+   if ok!=true {
+      log.Fatalf("function %s not define.", fnName)
+   }
+   return fn(fnP), nil
+}
+
+
+ParameterDeclaration <- QUOTE p:Parameter* QUOTE {
+   tmp := ""
+   ps := toIfaceSlice(p)
+   if ps==nil {
+      return "",nil
+   }
+   for _,v := range ps {
+      tmp += v.(string)
+   }
+   return tmp, nil
+}
+
+Parameter <- [^'"] {
+      return string(c.text), nil
+}
+
+
+Identifier <- !Keyword IdNondigit IdChar* {
+      return string(c.text), nil
+}
+
+IdNondigit
+   <- [a-z] / [A-Z] / [_]
+IdChar
+   <- [a-z] / [A-Z] / [0-9] / [_]
+
+Keyword <-
+   (
+      AND
+      / OR
+   )
+
+AND <- "and" {return string(c.text), nil}
+OR <- "or" {return string(c.text), nil}
+
+QUOTE <- ["']
+
+_  <- ( WhiteSpace
+      / LongComment
+      / LineComment
+      / Pragma
+      )*
+
+
+WhiteSpace  <- [ \n\r\t]            
+
+LongComment <- "/*" (!"*/".)* "*/"  
+
+LineComment <- "//" (!"\n" .)*      
+
+Pragma      <- "#"  (!"\n" .)*      
+
+
+LPAR      <-  "("
+RPAR      <-  ")"
+
+EOF <- !.

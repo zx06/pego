@@ -1,0 +1,60 @@
+package sample_logic_peg
+
+type SampleLogic Peg {
+}
+
+Input <- _ Expr _ EOF
+
+Expr <- _ Term ( _ AND _ Term )* _ 
+
+Term <- _ Factor ( _ OR _ Factor )* _ 
+
+Factor <- _ LPAR Expr RPAR _ 
+         / FnExp 
+
+FnExp <- Identifier LPAR ParameterDeclaration RPAR
+
+
+ParameterDeclaration <- QUOTE Parameter* QUOTE 
+
+Parameter <- [^''] 
+
+
+Identifier <- !Keyword IdNondigit IdChar* 
+
+IdNondigit
+   <- [a-z] / [A-Z] / [_]
+IdChar
+   <- [a-z] / [A-Z] / [0-9] / [_]
+
+Keyword <-
+   (
+      AND
+      / OR
+   )
+
+AND <- 'and'
+OR <- 'or'
+
+QUOTE <- ["']
+
+_  <- ( WhiteSpace
+      / LongComment
+      / LineComment
+      / Pragma
+      )*
+
+
+WhiteSpace  <- [ \n\r\t]            
+
+LongComment <- '/*' (!'*/'.)* '*/'  
+
+LineComment <- '//' (!'\n' .)*      
+
+Pragma      <- '#'  (!'\n' .)*      
+
+
+LPAR      <-  '('
+RPAR      <-  ')'
+
+EOF <- !.
